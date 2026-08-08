@@ -1,0 +1,29 @@
+# Python
+__pycache__/
+*.py[cod]
+.venv/
+.pytest_cache/
+.ruff_cache/
+.mypy_cache/
+
+# Variables y secretos
+.env
+.env.*
+!.env.example
+
+# Logs
+*.log
+logs/
+
+# Sistema operativo
+.DS_Store
+Thumbs.db
+
+# VS Code personal
+.vscode/*
+!.vscode/settings.json
+!.vscode/extensions.json
+
+# Backups temporales
+*.bak
+*.tmp
