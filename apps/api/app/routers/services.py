@@ -18,9 +18,10 @@ def create_service(
     db: Session = Depends(get_db),
 ):
     db_service = Service(
-        name=service.name,
-        status=service.status,
-    )
+    name=service.name,
+    status=service.status,
+    description=service.description,
+)
 
     db.add(db_service)
     db.commit()
