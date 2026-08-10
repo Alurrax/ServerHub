@@ -1,5 +1,7 @@
 from fastapi import FastAPI
 
+from app.database import check_database
+
 app = FastAPI(
     title="ServerHub API",
     version="0.1.0",
@@ -16,6 +18,9 @@ def root():
 
 @app.get("/health")
 def health():
+    check_database()
+
     return {
         "status": "healthy",
+        "database": "connected",
     }
