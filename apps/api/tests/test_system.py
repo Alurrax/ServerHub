@@ -58,3 +58,24 @@ def test_system_status():
     # Contenedor
     assert container["hostname"]
     assert container["process_id"] > 0
+
+def test_system_disks():
+    response = client.get("/system/disks")
+
+    assert response.status_code == 200
+
+    data = response.json()
+
+    assert "disks" in data
+    assert "count" in data
+
+    assert data["count"] >= 1
+    assert len(data["disks"]) == data["count"]
+
+    disk_names = [
+        disk["name"]
+        for disk in data["disks"]
+    ]
+
+    assert "sda" in disk_names
+    assert "nvme0n1" in disk_names

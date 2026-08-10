@@ -1,0 +1,16 @@
+[Unit]
+Description=ServerHub Host Agent
+After=network.target
+
+[Service]
+Type=simple
+User=alurrax
+WorkingDirectory=/home/alurrax/proyectos/serverhub/apps/agent
+
+ExecStart=/home/alurrax/proyectos/serverhub/apps/agent/.venv/bin/uvicorn main:app --host 0.0.0.0 --port 9000
+
+Restart=on-failure
+RestartSec=3
+
+[Install]
+WantedBy=multi-user.target

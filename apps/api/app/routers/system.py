@@ -1,9 +1,10 @@
 import os
 import socket
 import time
+import httpx
 
 import psutil
-from fastapi import APIRouter
+from fastapi import APIRouter, HTTPException
 
 
 router = APIRouter(
@@ -64,3 +65,22 @@ def system_status():
             "process_id": os.getpid(),
         },
     }
+
+@router.get("/disks")
+def system_disks():
+    agent_url = os.environ["AGENT_URL"]
+
+    try:
+        response = httpx.get(
+            f"{agent_url}/disks",
+            timeout=3.0,
+        )
+        response.raise_for_status()
+
+    except httpx.HTTPError as exc:
+        raise HTTPException(
+            status_code=503,
+            detail="Host Agent unavailable",
+        ) from exc
+
+    return response.json()
