@@ -9,6 +9,12 @@ class ServiceCreate(BaseModel):
     description: str | None = None
 
 
+class ServiceUpdate(BaseModel):
+    name: str | None = None
+    status: str | None = None
+    description: str | None = None
+
+
 class ServiceResponse(BaseModel):
     model_config = ConfigDict(from_attributes=True)
 
