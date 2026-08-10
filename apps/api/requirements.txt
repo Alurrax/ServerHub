@@ -5,3 +5,4 @@ psycopg[binary]
 alembic
 pytest
 httpx
+psutil
