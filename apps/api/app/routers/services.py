@@ -6,6 +6,7 @@ from app.database import get_db
 from app.models import Service
 from app.schemas import ServiceCreate, ServiceResponse, ServiceUpdate
 
+
 router = APIRouter(
     prefix="/services",
     tags=["services"],
@@ -18,16 +19,27 @@ def create_service(
     db: Session = Depends(get_db),
 ):
     db_service = Service(
-    name=service.name,
-    status=service.status,
-    description=service.description,
-)
+        name=service.name,
+        status=service.status,
+        description=service.description,
+    )
 
     db.add(db_service)
     db.commit()
     db.refresh(db_service)
 
     return db_service
+
+
+@router.get("", response_model=list[ServiceResponse])
+def list_services(
+    db: Session = Depends(get_db),
+):
+    result = db.execute(
+        select(Service).order_by(Service.id)
+    )
+
+    return result.scalars().all()
 
 
 @router.get("/{service_id}", response_model=ServiceResponse)
@@ -44,6 +56,7 @@ def get_service(
         )
 
     return service
+
 
 @router.patch("/{service_id}", response_model=ServiceResponse)
 def update_service(
@@ -70,6 +83,7 @@ def update_service(
     db.refresh(service)
 
     return service
+
 
 @router.delete("/{service_id}", status_code=204)
 def delete_service(

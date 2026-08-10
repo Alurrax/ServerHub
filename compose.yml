@@ -15,6 +15,7 @@ services:
     volumes:
       - ./apps/api/app:/app/app
       - ./apps/api/migrations:/app/migrations
+      - ./apps/api/tests:/app/tests
 
     command:
       - uvicorn
