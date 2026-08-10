@@ -79,3 +79,52 @@ def test_system_disks():
 
     assert "sda" in disk_names
     assert "nvme0n1" in disk_names
+
+def test_system_service_detail():
+    response = client.get("/system/services/docker")
+
+    assert response.status_code == 200
+
+    data = response.json()
+
+    assert data["name"] == "docker"
+    assert data["unit"] == "docker.service"
+
+    assert "load" in data
+    assert "active" in data
+    assert "sub" in data
+    assert "description" in data
+
+
+def test_system_service_not_found():
+    response = client.get(
+        "/system/services/serverhub-service-that-does-not-exist"
+    )
+
+    assert response.status_code == 404
+    assert response.json()["detail"] == "Service not found"
+
+def test_system_service_restart():
+    response = client.post(
+        "/system/services/smbd/restart"
+    )
+
+    assert response.status_code == 200
+
+    data = response.json()
+
+    assert data["service"] == "smbd"
+    assert data["action"] == "restart"
+    assert data["status"] == "success"
+
+
+def test_system_service_restart_forbidden():
+    response = client.post(
+        "/system/services/ssh/restart"
+    )
+
+    assert response.status_code == 403
+    assert (
+        response.json()["detail"]
+        == "Service is not managed by ServerHub"
+    )

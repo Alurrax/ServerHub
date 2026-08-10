@@ -1,0 +1,1 @@
+alurrax ALL=(root) NOPASSWD: /usr/bin/systemctl restart docker.service, /usr/bin/systemctl restart smbd.service
