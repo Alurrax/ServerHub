@@ -1,4 +1,4 @@
-.PHONY: help up down restart ps logs logs-api logs-db test health migrate migration current shell db-shell
+.PHONY: help up down restart ps logs logs-api logs-db test health migrate migration current shell db-shell check
 
 help:
 	@echo "ServerHub - comandos disponibles"
@@ -17,6 +17,7 @@ help:
 	@echo "make current    Muestra revisión Alembic actual"
 	@echo "make shell      Abre bash dentro del contenedor API"
 	@echo "make db-shell   Abre psql dentro de PostgreSQL"
+	@echo "make check      Verifica ServerHub antes de un commit"
 
 up:
 	docker compose up -d
@@ -60,3 +61,17 @@ shell:
 
 db-shell:
 	docker compose exec db psql -U serverhub -d serverhub
+
+check:
+	@echo "=== ServerHub Check ==="
+	@echo ""
+	@echo "1. Estado de contenedores:"
+	docker compose ps
+	@echo ""
+	@echo "2. Health de la API:"
+	curl -f http://127.0.0.1:8000/health
+	@echo ""
+	@echo "3. Tests:"
+	docker compose exec api python -m pytest -v
+	@echo ""
+	@echo "=== Check completado correctamente ==="
