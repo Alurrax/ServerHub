@@ -1,0 +1,62 @@
+.PHONY: help up down restart ps logs logs-api logs-db test health migrate migration current shell db-shell
+
+help:
+	@echo "ServerHub - comandos disponibles"
+	@echo ""
+	@echo "make up         Levanta los servicios"
+	@echo "make down       Baja los servicios"
+	@echo "make restart    Reinicia los servicios"
+	@echo "make ps         Muestra estado de contenedores"
+	@echo "make logs       Muestra logs de todos los servicios"
+	@echo "make logs-api   Muestra logs de FastAPI"
+	@echo "make logs-db    Muestra logs de PostgreSQL"
+	@echo "make test       Ejecuta pytest"
+	@echo "make health     Prueba /health"
+	@echo "make migrate    Aplica migraciones Alembic"
+	@echo "make migration  Genera migración automática"
+	@echo "make current    Muestra revisión Alembic actual"
+	@echo "make shell      Abre bash dentro del contenedor API"
+	@echo "make db-shell   Abre psql dentro de PostgreSQL"
+
+up:
+	docker compose up -d
+
+down:
+	docker compose down
+
+restart:
+	docker compose restart
+
+ps:
+	docker compose ps
+
+logs:
+	docker compose logs -f
+
+logs-api:
+	docker compose logs -f api
+
+logs-db:
+	docker compose logs -f db
+
+test:
+	docker compose exec api python -m pytest -v
+
+health:
+	curl http://127.0.0.1:8000/health
+
+migrate:
+	docker compose exec api alembic upgrade head
+
+migration:
+	@read -p "Nombre de la migración: " msg; \
+	docker compose exec api alembic revision --autogenerate -m "$$msg"
+
+current:
+	docker compose exec api alembic current
+
+shell:
+	docker compose exec api bash
+
+db-shell:
+	docker compose exec db psql -U serverhub -d serverhub
