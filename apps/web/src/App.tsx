@@ -1,6 +1,8 @@
 import { useEffect, useState } from "react";
 import "./App.css";
 
+const API_URL = "http://192.168.1.9:8000";
+
 type SystemStatus = {
   host: {
     hostname: string;
@@ -32,32 +34,126 @@ type SystemStatus = {
   };
 };
 
+type DockerContainer = {
+  id: string;
+  name: string;
+  image: string;
+  status: string;
+  state: string;
+};
+
+type DockerContainersResponse = {
+  containers: DockerContainer[];
+  count: number;
+};
+
+type DockerStats = {
+  name: string;
+  cpu_percent: number;
+  memory: {
+    usage: string;
+    limit: string;
+    percent: number;
+  };
+  network_io: string;
+  block_io: string;
+  pids: number;
+};
+
+type ContainerWithStats = DockerContainer & {
+  stats?: DockerStats;
+};
+
 function formatUptime(seconds: number) {
-  const hours = Math.floor(seconds / 3600);
+  const days = Math.floor(seconds / 86400);
+  const hours = Math.floor((seconds % 86400) / 3600);
   const minutes = Math.floor((seconds % 3600) / 60);
+
+  if (days > 0) {
+    return `${days}d ${hours}h`;
+  }
 
   return `${hours}h ${minutes}m`;
 }
 
 function App() {
   const [status, setStatus] = useState<SystemStatus | null>(null);
+  const [containers, setContainers] = useState<ContainerWithStats[]>([]);
+  const [containerCount, setContainerCount] = useState(0);
   const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
-    fetch("http://192.168.1.9:8000/system/status")
-      .then((response) => {
-        if (!response.ok) {
+    async function loadDashboard() {
+      try {
+        const statusResponse = await fetch(`${API_URL}/system/status`);
+
+        if (!statusResponse.ok) {
           throw new Error("No se pudo obtener el estado del servidor");
         }
 
-        return response.json();
-      })
-      .then((data) => {
-        setStatus(data);
-      })
-      .catch((err) => {
-        setError(err.message);
-      });
+        const statusData: SystemStatus = await statusResponse.json();
+        setStatus(statusData);
+
+        const containersResponse = await fetch(
+          `${API_URL}/system/docker/containers`,
+        );
+
+        if (!containersResponse.ok) {
+          throw new Error("No se pudo obtener información de Docker");
+        }
+
+        const containersData: DockerContainersResponse =
+          await containersResponse.json();
+
+          setContainerCount(containersData.count);
+
+        const containersWithStats = await Promise.all(
+          containersData.containers.map(async (container) => {
+            if (container.state !== "running") {
+              return container;
+            }
+
+            try {
+              const statsResponse = await fetch(
+                `${API_URL}/system/docker/containers/${container.name}/stats`,
+              );
+
+              if (!statsResponse.ok) {
+                return container;
+              }
+
+              const stats: DockerStats = await statsResponse.json();
+
+              return {
+                ...container,
+                stats,
+              };
+            } catch {
+              return container;
+            }
+          }),
+        );
+
+        setContainers(containersWithStats);
+        setError(null);
+      } catch (err) {
+        if (err instanceof Error) {
+          setError(err.message);
+        } else {
+          setError("Error desconocido");
+        }
+      }
+    }
+
+        loadDashboard();
+
+    const interval = window.setInterval(() => {
+      loadDashboard();
+    }, 5000);
+
+    return () => {
+      window.clearInterval(interval);
+    };
   }, []);
 
   return (
@@ -127,23 +223,79 @@ function App() {
               </article>
             </section>
 
-            <section className="details">
-              <h3>Memoria swap</h3>
+            <section className="dashboard-grid">
+              <section className="details">
+                <h3>Memoria swap</h3>
 
-              <div className="detail-row">
-                <span>Uso</span>
-                <strong>{status.host.swap.percent}%</strong>
-              </div>
+                <div className="detail-row">
+                  <span>Uso</span>
+                  <strong>{status.host.swap.percent}%</strong>
+                </div>
 
-              <div className="detail-row">
-                <span>Total</span>
-                <strong>{status.host.swap.total_gb} GB</strong>
-              </div>
+                <div className="detail-row">
+                  <span>Total</span>
+                  <strong>{status.host.swap.total_gb} GB</strong>
+                </div>
 
-              <div className="detail-row">
-                <span>Libre</span>
-                <strong>{status.host.swap.free_gb} GB</strong>
-              </div>
+                <div className="detail-row">
+                  <span>Libre</span>
+                  <strong>{status.host.swap.free_gb} GB</strong>
+                </div>
+              </section>
+
+              <section className="docker-panel">
+                <div className="section-heading">
+                  <div>
+                    <h3>Docker</h3>
+                    <p>{containerCount} contenedores</p>
+                  </div>
+                </div>
+
+                <div className="containers">
+                  {containers.map((container) => (
+                    <article className="container-card" key={container.id}>
+                      <div className="container-header">
+                        <div>
+                          <strong>{container.name}</strong>
+                          <small>{container.image}</small>
+                        </div>
+
+                        <span
+                          className={
+                            container.state === "running"
+                              ? "container-running"
+                              : "container-stopped"
+                          }
+                        >
+                          ● {container.state}
+                        </span>
+                      </div>
+
+                      {container.stats && (
+                        <div className="container-stats">
+                          <div>
+                            <span>CPU</span>
+                            <strong>{container.stats.cpu_percent}%</strong>
+                          </div>
+
+                          <div>
+                            <span>RAM</span>
+                            <strong>
+                              {container.stats.memory.percent}%
+                            </strong>
+                            <small>{container.stats.memory.usage}</small>
+                          </div>
+
+                          <div>
+                            <span>PIDs</span>
+                            <strong>{container.stats.pids}</strong>
+                          </div>
+                        </div>
+                      )}
+                    </article>
+                  ))}
+                </div>
+              </section>
             </section>
           </>
         )}
