@@ -25,6 +25,32 @@ ServerHub permite consultar y administrar información real del servidor:
 
 ---
 
+## Interfaz web
+
+### Dashboard
+
+Monitorización general del servidor y de los contenedores Docker.
+
+![Dashboard de ServerHub](docs/images/serverhub-dashboard.png)
+
+### Sistema
+
+Información en tiempo real del host Ubuntu: CPU, memoria, swap, carga y almacenamiento raíz.
+
+![Sistema de ServerHub](docs/images/serverhub-sistema.png)
+
+### Servicios
+
+Consulta, filtrado y administración controlada de servicios systemd.
+
+![Servicios de ServerHub](docs/images/serverhub-servicios.png)
+
+### Discos
+
+Visualización de discos físicos, particiones, sistemas de archivos y puntos de montaje.
+
+![Discos de ServerHub](docs/images/serverhub-discos.png)
+
 ## Arquitectura
 
 ```text
@@ -498,4 +524,4 @@ El objetivo no es solamente construir una herramienta funcional, sino también u
 
 **En desarrollo activo.**
 
-El siguiente hito será revisar y consolidar la arquitectura actual antes de incorporar nuevas capas como autenticación, Nginx o CI/CD.
+El siguiente hito será revisar y consolidar la arquitectura actual antes de incorporar nuevas capas como autenticación, Nginx o CI/CD
