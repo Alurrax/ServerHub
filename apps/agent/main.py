@@ -22,6 +22,15 @@ MANAGED_SERVICES = {
     },
 }
 
+MANAGED_CONTAINERS = {
+    "serverhub-api": {
+        "actions": {"restart"},
+    },
+    "serverhub-db": {
+        "actions": {"restart"},
+    },
+}
+
 
 def validate_service_action(name: str, action: str) -> str:
     service = MANAGED_SERVICES.get(name)
@@ -380,6 +389,58 @@ def get_docker_container_stats(name: str) -> dict:
         "pids": int(data.get("PIDs", 0)),
     }
 
+def validate_container_action(name: str, action: str) -> None:
+    container = MANAGED_CONTAINERS.get(name)
+
+    if container is None:
+        raise HTTPException(
+            status_code=403,
+            detail="Container is not managed by ServerHub",
+        )
+
+    if action not in container["actions"]:
+        raise HTTPException(
+            status_code=403,
+            detail=f"Action '{action}' is not allowed for container '{name}'",
+        )
+
+def run_docker_container_action(name: str, action: str) -> dict:
+    validate_container_action(name, action)
+
+    try:
+        result = subprocess.run(
+            ["docker", action, name],
+            capture_output=True,
+            text=True,
+            check=True,
+            timeout=30,
+        )
+
+    except subprocess.CalledProcessError as exc:
+        error = exc.stderr.strip()
+
+        if "No such container" in error:
+            raise HTTPException(
+                status_code=404,
+                detail="Container not found",
+            ) from exc
+
+        raise HTTPException(
+            status_code=500,
+            detail=error or f"Failed to {action} container",
+        ) from exc
+
+    except subprocess.TimeoutExpired as exc:
+        raise HTTPException(
+            status_code=504,
+            detail=f"Container {action} timed out",
+        ) from exc
+
+    return {
+        "container": name,
+        "action": action,
+        "status": "success",
+    }
 
 @app.get("/health")
 def health():
@@ -437,3 +498,7 @@ def docker_container_detail(name: str):
 @app.get("/docker/containers/{name}/stats")
 def docker_container_stats(name: str):
     return get_docker_container_stats(name)
+
+@app.post("/docker/containers/{name}/restart")
+def restart_docker_container(name: str):
+    return run_docker_container_action(name, "restart")

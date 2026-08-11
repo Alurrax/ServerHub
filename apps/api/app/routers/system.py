@@ -259,3 +259,45 @@ def system_docker_container_stats(name: str):
     response.raise_for_status()
 
     return response.json()
+
+@router.post("/docker/containers/{name}/restart")
+def system_docker_container_restart(name: str):
+    agent_url = os.environ["AGENT_URL"]
+
+    try:
+        response = httpx.post(
+            f"{agent_url}/docker/containers/{name}/restart",
+            timeout=30.0,
+        )
+
+    except httpx.HTTPError as exc:
+        raise HTTPException(
+            status_code=503,
+            detail="Host Agent unavailable",
+        ) from exc
+
+    if response.status_code == 403:
+        detail = response.json().get(
+            "detail",
+            "Container action not allowed",
+        )
+        raise HTTPException(
+            status_code=403,
+            detail=detail,
+        )
+
+    if response.status_code == 404:
+        raise HTTPException(
+            status_code=404,
+            detail="Container not found",
+        )
+
+    if response.status_code >= 500:
+        raise HTTPException(
+            status_code=502,
+            detail="Host Agent failed to restart container",
+        )
+
+    response.raise_for_status()
+
+    return response.json()

@@ -209,3 +209,28 @@ def test_system_docker_container_stats_not_found():
 
     assert response.status_code == 404
     assert response.json()["detail"] == "Container not found"
+
+def test_system_docker_container_restart():
+    response = client.post(
+        "/system/docker/containers/serverhub-db/restart"
+    )
+
+    assert response.status_code == 200
+
+    data = response.json()
+
+    assert data["container"] == "serverhub-db"
+    assert data["action"] == "restart"
+    assert data["status"] == "success"
+
+
+def test_system_docker_container_restart_forbidden():
+    response = client.post(
+        "/system/docker/containers/no-existe/restart"
+    )
+
+    assert response.status_code == 403
+    assert (
+        response.json()["detail"]
+        == "Container is not managed by ServerHub"
+    )
