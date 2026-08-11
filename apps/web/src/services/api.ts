@@ -1,5 +1,6 @@
 import type {
   ContainerWithStats,
+  DisksResponse,
   DockerContainersResponse,
   DockerStats,
   ServicesResponse,
@@ -95,4 +96,8 @@ export function restartService(name: string) {
       method: "POST",
     },
   );
+}
+
+export function getDisks() {
+  return request<DisksResponse>("/system/disks");
 }

@@ -5,6 +5,8 @@ import Sidebar from "./components/Sidebar";
 import type { Page } from "./components/Sidebar";
 import Dashboard from "./pages/Dashboard";
 import Services from "./pages/Services";
+import System from "./pages/System";
+import Disks from "./pages/Disks";
 
 function App() {
   const [currentPage, setCurrentPage] =
@@ -23,10 +25,7 @@ function App() {
         )}
 
         {currentPage === "system" && (
-          <div>
-            <h1>Sistema</h1>
-            <p>Próximamente.</p>
-          </div>
+          <System />
         )}
 
         {currentPage === "docker" && (
@@ -41,10 +40,7 @@ function App() {
         )}
 
         {currentPage === "disks" && (
-          <div>
-            <h1>Discos</h1>
-            <p>Próximamente.</p>
-          </div>
+           <Disks />
         )}
       </main>
     </div>

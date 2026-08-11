@@ -622,3 +622,166 @@ body {
     flex-wrap: wrap;
   }
 }
+.system-header-card {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  background: white;
+  border: 1px solid #e5e7eb;
+  border-radius: 12px;
+  padding: 20px 24px;
+  margin-bottom: 20px;
+}
+
+.system-header-card span {
+  display: block;
+  color: #6b7280;
+  font-size: 13px;
+  margin-bottom: 5px;
+}
+
+.system-header-card h2 {
+  margin: 0;
+}
+
+.system-header-card strong {
+  font-size: 20px;
+}
+
+.system-sections {
+  display: grid;
+  grid-template-columns: repeat(2, 1fr);
+  gap: 20px;
+}
+
+.system-panel {
+  background: white;
+  border: 1px solid #e5e7eb;
+  border-radius: 12px;
+  padding: 22px;
+}
+
+.system-panel h3 {
+  margin: 0 0 16px;
+}
+
+.system-main-value {
+  font-size: 34px;
+  font-weight: 700;
+  margin-bottom: 18px;
+}
+
+.system-row {
+  display: flex;
+  justify-content: space-between;
+  gap: 20px;
+  padding: 9px 0;
+  border-bottom: 1px solid #f1f5f9;
+}
+
+.system-row:last-child {
+  border-bottom: none;
+}
+
+.system-row span {
+  color: #6b7280;
+}
+
+@media (max-width: 900px) {
+  .system-sections {
+    grid-template-columns: 1fr;
+  }
+
+  .system-header-card {
+    align-items: flex-start;
+    flex-direction: column;
+    gap: 18px;
+  }
+}
+.disks-grid {
+  display: grid;
+  gap: 22px;
+}
+
+.disk-card {
+  background: white;
+  border: 1px solid #e5e7eb;
+  border-radius: 12px;
+  overflow: hidden;
+}
+
+.disk-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 20px 22px;
+  border-bottom: 1px solid #e5e7eb;
+}
+
+.disk-header span,
+.partition-row span {
+  display: block;
+  color: #6b7280;
+  font-size: 12px;
+  margin-bottom: 4px;
+}
+
+.disk-header h2 {
+  margin: 2px 0;
+}
+
+.disk-header small,
+.partition-main small {
+  color: #6b7280;
+}
+
+.disk-header > strong {
+  font-size: 22px;
+}
+
+.partitions {
+  display: flex;
+  flex-direction: column;
+}
+
+.partition-row {
+  display: grid;
+  grid-template-columns:
+    minmax(150px, 1.4fr)
+    100px
+    120px
+    110px
+    80px
+    110px
+    minmax(100px, 1fr);
+  gap: 16px;
+  align-items: center;
+  padding: 14px 22px;
+  border-bottom: 1px solid #f1f5f9;
+}
+
+.partition-row:last-child {
+  border-bottom: none;
+}
+
+.partition-main strong {
+  display: block;
+}
+
+@media (max-width: 1100px) {
+  .partition-row {
+    grid-template-columns: repeat(2, 1fr);
+  }
+}
+
+@media (max-width: 700px) {
+  .partition-row {
+    grid-template-columns: 1fr;
+  }
+
+  .disk-header {
+    align-items: flex-start;
+    flex-direction: column;
+    gap: 12px;
+  }
+}
