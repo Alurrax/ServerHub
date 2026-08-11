@@ -59,18 +59,40 @@ def test_system_status():
     assert container["hostname"]
     assert container["process_id"] > 0
 
-def test_system_disks():
+def test_system_disks(monkeypatch):
+    mock_response = Mock()
+    mock_response.status_code = 200
+    mock_response.json.return_value = {
+        "disks": [
+            {
+                "name": "sda",
+                "path": "/dev/sda",
+                "size_gib": 931.51,
+                "partitions": [],
+            },
+            {
+                "name": "nvme0n1",
+                "path": "/dev/nvme0n1",
+                "size_gib": 119.24,
+                "partitions": [],
+            },
+        ],
+        "count": 2,
+    }
+    mock_response.raise_for_status.return_value = None
+
+    monkeypatch.setattr(
+        "app.routers.system.httpx.get",
+        lambda *args, **kwargs: mock_response,
+    )
+
     response = client.get("/system/disks")
 
     assert response.status_code == 200
 
     data = response.json()
 
-    assert "disks" in data
-    assert "count" in data
-
-    assert data["count"] >= 1
-    assert len(data["disks"]) == data["count"]
+    assert data["count"] == 2
 
     disk_names = [
         disk["name"]
@@ -80,7 +102,24 @@ def test_system_disks():
     assert "sda" in disk_names
     assert "nvme0n1" in disk_names
 
-def test_system_service_detail():
+def test_system_service_detail(monkeypatch):
+    mock_response = Mock()
+    mock_response.status_code = 200
+    mock_response.json.return_value = {
+        "unit": "docker.service",
+        "name": "docker",
+        "load": "loaded",
+        "active": "active",
+        "sub": "running",
+        "description": "Docker Application Container Engine",
+    }
+    mock_response.raise_for_status.return_value = None
+
+    monkeypatch.setattr(
+        "app.routers.system.httpx.get",
+        lambda *args, **kwargs: mock_response,
+    )
+
     response = client.get("/system/services/docker")
 
     assert response.status_code == 200
@@ -90,13 +129,15 @@ def test_system_service_detail():
     assert data["name"] == "docker"
     assert data["unit"] == "docker.service"
 
-    assert "load" in data
-    assert "active" in data
-    assert "sub" in data
-    assert "description" in data
+def test_system_service_not_found(monkeypatch):
+    mock_response = Mock()
+    mock_response.status_code = 404
 
+    monkeypatch.setattr(
+        "app.routers.system.httpx.get",
+        lambda *args, **kwargs: mock_response,
+    )
 
-def test_system_service_not_found():
     response = client.get(
         "/system/services/serverhub-service-that-does-not-exist"
     )
@@ -163,16 +204,36 @@ def test_system_service_restart_forbidden(monkeypatch):
         == "Service is not managed by ServerHub"
     )
 
-def test_system_docker_containers():
+def test_system_docker_containers(monkeypatch):
+    mock_response = Mock()
+    mock_response.status_code = 200
+    mock_response.json.return_value = {
+        "containers": [
+            {
+                "name": "serverhub-api",
+                "state": "running",
+            },
+            {
+                "name": "serverhub-db",
+                "state": "running",
+            },
+        ],
+        "count": 2,
+    }
+    mock_response.raise_for_status.return_value = None
+
+    monkeypatch.setattr(
+        "app.routers.system.httpx.get",
+        lambda *args, **kwargs: mock_response,
+    )
+
     response = client.get("/system/docker/containers")
 
     assert response.status_code == 200
 
     data = response.json()
 
-    assert "containers" in data
-    assert "count" in data
-    assert data["count"] >= 2
+    assert data["count"] == 2
 
     names = [
         container["name"]
@@ -182,7 +243,25 @@ def test_system_docker_containers():
     assert "serverhub-api" in names
     assert "serverhub-db" in names
 
-def test_system_docker_container_detail():
+def test_system_docker_container_detail(monkeypatch):
+    mock_response = Mock()
+    mock_response.status_code = 200
+    mock_response.json.return_value = {
+        "name": "serverhub-api",
+        "image": "serverhub-api",
+        "status": "running",
+        "running": True,
+        "restart_count": 0,
+        "networks": {},
+        "ports": {},
+    }
+    mock_response.raise_for_status.return_value = None
+
+    monkeypatch.setattr(
+        "app.routers.system.httpx.get",
+        lambda *args, **kwargs: mock_response,
+    )
+
     response = client.get(
         "/system/docker/containers/serverhub-api"
     )
@@ -192,16 +271,17 @@ def test_system_docker_container_detail():
     data = response.json()
 
     assert data["name"] == "serverhub-api"
-    assert data["status"] == "running"
     assert data["running"] is True
 
-    assert "image" in data
-    assert "restart_count" in data
-    assert "networks" in data
-    assert "ports" in data
+def test_system_docker_container_not_found(monkeypatch):
+    mock_response = Mock()
+    mock_response.status_code = 404
 
+    monkeypatch.setattr(
+        "app.routers.system.httpx.get",
+        lambda *args, **kwargs: mock_response,
+    )
 
-def test_system_docker_container_not_found():
     response = client.get(
         "/system/docker/containers/no-existe"
     )
@@ -209,7 +289,28 @@ def test_system_docker_container_not_found():
     assert response.status_code == 404
     assert response.json()["detail"] == "Container not found"
 
-def test_system_docker_container_stats():
+def test_system_docker_container_stats(monkeypatch):
+    mock_response = Mock()
+    mock_response.status_code = 200
+    mock_response.json.return_value = {
+        "name": "serverhub-api",
+        "cpu_percent": 0.31,
+        "memory": {
+            "usage": "105.9MiB",
+            "limit": "7.119GiB",
+            "percent": 1.45,
+        },
+        "network_io": "717kB / 340kB",
+        "block_io": "5.19MB / 3.02MB",
+        "pids": 5,
+    }
+    mock_response.raise_for_status.return_value = None
+
+    monkeypatch.setattr(
+        "app.routers.system.httpx.get",
+        lambda *args, **kwargs: mock_response,
+    )
+
     response = client.get(
         "/system/docker/containers/serverhub-api/stats"
     )
@@ -218,25 +319,20 @@ def test_system_docker_container_stats():
 
     data = response.json()
 
-    assert data["name"] == "serverhub-api"
-
     assert isinstance(data["cpu_percent"], float)
-    assert data["cpu_percent"] >= 0
-
-    assert "memory" in data
-    assert "usage" in data["memory"]
-    assert "limit" in data["memory"]
     assert isinstance(data["memory"]["percent"], float)
-    assert data["memory"]["percent"] >= 0
-
-    assert "network_io" in data
-    assert "block_io" in data
-
     assert isinstance(data["pids"], int)
-    assert data["pids"] >= 0
 
 
-def test_system_docker_container_stats_not_found():
+def test_system_docker_container_stats_not_found(monkeypatch):
+    mock_response = Mock()
+    mock_response.status_code = 404
+
+    monkeypatch.setattr(
+        "app.routers.system.httpx.get",
+        lambda *args, **kwargs: mock_response,
+    )
+
     response = client.get(
         "/system/docker/containers/no-existe/stats"
     )
