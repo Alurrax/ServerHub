@@ -80,3 +80,8 @@ check:
 
 test-integration:
 	docker compose exec api python -m pytest -v -m integration
+
+map:
+	python3 scripts/serverhub_map.py
+	dot -Tsvg serverhub-global.dot -o serverhub-global.svg
+	@echo "Mapa generado: serverhub-global.svg"

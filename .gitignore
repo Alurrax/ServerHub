@@ -27,3 +27,9 @@ Thumbs.db
 # Backups temporales
 *.bak
 *.tmp
+# ServerHub dependency maps
+serverhub-global.dot
+serverhub-global.svg
+serverhub-api-deps.svg
+serverhub-api-internal.svg
+app.svg
