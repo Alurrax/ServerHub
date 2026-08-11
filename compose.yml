@@ -18,6 +18,7 @@ services:
       - ./apps/api/app:/app/app
       - ./apps/api/migrations:/app/migrations
       - ./apps/api/tests:/app/tests
+      - ./apps/api/pytest.ini:/app/pytest.ini
 
     command:
       - uvicorn

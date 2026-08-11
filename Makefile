@@ -1,4 +1,4 @@
-.PHONY: help up down restart ps logs logs-api logs-db test health migrate migration current shell db-shell check
+.PHONY: help up down restart ps logs logs-api logs-db test test-integration health migrate migration current shell db-shell check
 
 help:
 	@echo "ServerHub - comandos disponibles"
@@ -18,6 +18,8 @@ help:
 	@echo "make shell      Abre bash dentro del contenedor API"
 	@echo "make db-shell   Abre psql dentro de PostgreSQL"
 	@echo "make check      Verifica ServerHub antes de un commit"
+	@echo "make test              Ejecuta tests normales"
+	@echo "make test-integration  Ejecuta tests contra el servidor real"
 
 up:
 	docker compose up -d
@@ -41,7 +43,7 @@ logs-db:
 	docker compose logs -f db
 
 test:
-	docker compose exec api python -m pytest -v
+	docker compose exec api python -m pytest -v -m "not integration"
 
 health:
 	curl http://127.0.0.1:8000/health
@@ -72,6 +74,9 @@ check:
 	curl -f http://127.0.0.1:8000/health
 	@echo ""
 	@echo "3. Tests:"
-	docker compose exec api python -m pytest -v
+	$(MAKE) test
 	@echo ""
 	@echo "=== Check completado correctamente ==="
+
+test-integration:
+	docker compose exec api python -m pytest -v -m integration
