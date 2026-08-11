@@ -1,5 +1,5 @@
 from fastapi.testclient import TestClient
-
+from unittest.mock import Mock
 from app.main import app
 
 
@@ -104,7 +104,26 @@ def test_system_service_not_found():
     assert response.status_code == 404
     assert response.json()["detail"] == "Service not found"
 
-def test_system_service_restart():
+def test_system_service_restart(monkeypatch):
+    mock_response = Mock()
+
+    mock_response.status_code = 200
+    mock_response.json.return_value = {
+        "service": "smbd",
+        "action": "restart",
+        "status": "success",
+    }
+
+    mock_response.raise_for_status.return_value = None
+
+    def mock_post(*args, **kwargs):
+        return mock_response
+
+    monkeypatch.setattr(
+        "app.routers.system.httpx.post",
+        mock_post,
+    )
+
     response = client.post(
         "/system/services/smbd/restart"
     )
@@ -118,7 +137,22 @@ def test_system_service_restart():
     assert data["status"] == "success"
 
 
-def test_system_service_restart_forbidden():
+def test_system_service_restart_forbidden(monkeypatch):
+    mock_response = Mock()
+
+    mock_response.status_code = 403
+    mock_response.json.return_value = {
+        "detail": "Service is not managed by ServerHub"
+    }
+
+    def mock_post(*args, **kwargs):
+        return mock_response
+
+    monkeypatch.setattr(
+        "app.routers.system.httpx.post",
+        mock_post,
+    )
+
     response = client.post(
         "/system/services/ssh/restart"
     )
@@ -210,7 +244,26 @@ def test_system_docker_container_stats_not_found():
     assert response.status_code == 404
     assert response.json()["detail"] == "Container not found"
 
-def test_system_docker_container_restart():
+def test_system_docker_container_restart(monkeypatch):
+    mock_response = Mock()
+
+    mock_response.status_code = 200
+    mock_response.json.return_value = {
+        "container": "serverhub-db",
+        "action": "restart",
+        "status": "success",
+    }
+
+    mock_response.raise_for_status.return_value = None
+
+    def mock_post(*args, **kwargs):
+        return mock_response
+
+    monkeypatch.setattr(
+        "app.routers.system.httpx.post",
+        mock_post,
+    )
+
     response = client.post(
         "/system/docker/containers/serverhub-db/restart"
     )
@@ -223,8 +276,22 @@ def test_system_docker_container_restart():
     assert data["action"] == "restart"
     assert data["status"] == "success"
 
+def test_system_docker_container_restart_forbidden(monkeypatch):
+    mock_response = Mock()
 
-def test_system_docker_container_restart_forbidden():
+    mock_response.status_code = 403
+    mock_response.json.return_value = {
+        "detail": "Container is not managed by ServerHub"
+    }
+
+    def mock_post(*args, **kwargs):
+        return mock_response
+
+    monkeypatch.setattr(
+        "app.routers.system.httpx.post",
+        mock_post,
+    )
+
     response = client.post(
         "/system/docker/containers/no-existe/restart"
     )
