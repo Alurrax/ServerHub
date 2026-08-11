@@ -40,6 +40,8 @@ type DockerContainer = {
   image: string;
   status: string;
   state: string;
+  ports?: string;
+  created_at?: string;
 };
 
 type DockerContainersResponse = {
@@ -80,72 +82,75 @@ function App() {
   const [status, setStatus] = useState<SystemStatus | null>(null);
   const [containers, setContainers] = useState<ContainerWithStats[]>([]);
   const [containerCount, setContainerCount] = useState(0);
+
   const [error, setError] = useState<string | null>(null);
+  const [actionMessage, setActionMessage] = useState<string | null>(null);
+  const [restarting, setRestarting] = useState<string | null>(null);
 
-  useEffect(() => {
-    async function loadDashboard() {
-      try {
-        const statusResponse = await fetch(`${API_URL}/system/status`);
+  async function loadDashboard() {
+    try {
+      const statusResponse = await fetch(`${API_URL}/system/status`);
 
-        if (!statusResponse.ok) {
-          throw new Error("No se pudo obtener el estado del servidor");
-        }
+      if (!statusResponse.ok) {
+        throw new Error("No se pudo obtener el estado del servidor");
+      }
 
-        const statusData: SystemStatus = await statusResponse.json();
-        setStatus(statusData);
+      const statusData: SystemStatus = await statusResponse.json();
+      setStatus(statusData);
 
-        const containersResponse = await fetch(
-          `${API_URL}/system/docker/containers`,
-        );
+      const containersResponse = await fetch(
+        `${API_URL}/system/docker/containers`,
+      );
 
-        if (!containersResponse.ok) {
-          throw new Error("No se pudo obtener información de Docker");
-        }
+      if (!containersResponse.ok) {
+        throw new Error("No se pudo obtener información de Docker");
+      }
 
-        const containersData: DockerContainersResponse =
-          await containersResponse.json();
+      const containersData: DockerContainersResponse =
+        await containersResponse.json();
 
-          setContainerCount(containersData.count);
+      setContainerCount(containersData.count);
 
-        const containersWithStats = await Promise.all(
-          containersData.containers.map(async (container) => {
-            if (container.state !== "running") {
+      const containersWithStats = await Promise.all(
+        containersData.containers.map(async (container) => {
+          if (container.state !== "running") {
+            return container;
+          }
+
+          try {
+            const statsResponse = await fetch(
+              `${API_URL}/system/docker/containers/${container.name}/stats`,
+            );
+
+            if (!statsResponse.ok) {
               return container;
             }
 
-            try {
-              const statsResponse = await fetch(
-                `${API_URL}/system/docker/containers/${container.name}/stats`,
-              );
+            const stats: DockerStats = await statsResponse.json();
 
-              if (!statsResponse.ok) {
-                return container;
-              }
+            return {
+              ...container,
+              stats,
+            };
+          } catch {
+            return container;
+          }
+        }),
+      );
 
-              const stats: DockerStats = await statsResponse.json();
-
-              return {
-                ...container,
-                stats,
-              };
-            } catch {
-              return container;
-            }
-          }),
-        );
-
-        setContainers(containersWithStats);
-        setError(null);
-      } catch (err) {
-        if (err instanceof Error) {
-          setError(err.message);
-        } else {
-          setError("Error desconocido");
-        }
+      setContainers(containersWithStats);
+      setError(null);
+    } catch (err) {
+      if (err instanceof Error) {
+        setError(err.message);
+      } else {
+        setError("Error desconocido");
       }
     }
+  }
 
-        loadDashboard();
+  useEffect(() => {
+    loadDashboard();
 
     const interval = window.setInterval(() => {
       loadDashboard();
@@ -155,6 +160,51 @@ function App() {
       window.clearInterval(interval);
     };
   }, []);
+
+  async function restartContainer(name: string) {
+    const confirmed = window.confirm(
+      `¿Reiniciar el contenedor ${name}?`,
+    );
+
+    if (!confirmed) {
+      return;
+    }
+
+    setRestarting(name);
+    setActionMessage(null);
+
+    try {
+      const response = await fetch(
+        `${API_URL}/system/docker/containers/${name}/restart`,
+        {
+          method: "POST",
+        },
+      );
+
+      const data = await response.json();
+
+      if (!response.ok) {
+        throw new Error(
+          data.detail ?? "No se pudo reiniciar el contenedor",
+        );
+      }
+
+      setActionMessage(`${name} reiniciado correctamente`);
+
+      // Esperamos brevemente para que Docker actualice el estado.
+      window.setTimeout(() => {
+        loadDashboard();
+      }, 1500);
+    } catch (err) {
+      if (err instanceof Error) {
+        setActionMessage(err.message);
+      } else {
+        setActionMessage("Error desconocido");
+      }
+    } finally {
+      setRestarting(null);
+    }
+  }
 
   return (
     <div className="app">
@@ -182,14 +232,23 @@ function App() {
 
         {error && <div className="error">{error}</div>}
 
+        {actionMessage && (
+          <div className="action-message">
+            {actionMessage}
+          </div>
+        )}
+
         {!status && !error && (
-          <div className="loading">Cargando información...</div>
+          <div className="loading">
+            Cargando información...
+          </div>
         )}
 
         {status && (
           <>
             <section className="server-title">
               <h2>{status.host.hostname}</h2>
+
               <span>
                 {status.host.cpu.physical_cores} núcleos físicos ·{" "}
                 {status.host.cpu.logical_cores} lógicos
@@ -204,7 +263,11 @@ function App() {
 
               <article className="card">
                 <span>RAM</span>
-                <strong>{status.host.memory.percent}%</strong>
+
+                <strong>
+                  {status.host.memory.percent}%
+                </strong>
+
                 <small>
                   {status.host.memory.used_gb} /{" "}
                   {status.host.memory.total_gb} GB
@@ -213,13 +276,22 @@ function App() {
 
               <article className="card">
                 <span>Disco /</span>
-                <strong>{status.host.disk.percent}%</strong>
-                <small>{status.host.disk.free_gb} GB libres</small>
+
+                <strong>
+                  {status.host.disk.percent}%
+                </strong>
+
+                <small>
+                  {status.host.disk.free_gb} GB libres
+                </small>
               </article>
 
               <article className="card">
                 <span>Uptime</span>
-                <strong>{formatUptime(status.host.uptime_seconds)}</strong>
+
+                <strong>
+                  {formatUptime(status.host.uptime_seconds)}
+                </strong>
               </article>
             </section>
 
@@ -229,17 +301,23 @@ function App() {
 
                 <div className="detail-row">
                   <span>Uso</span>
-                  <strong>{status.host.swap.percent}%</strong>
+                  <strong>
+                    {status.host.swap.percent}%
+                  </strong>
                 </div>
 
                 <div className="detail-row">
                   <span>Total</span>
-                  <strong>{status.host.swap.total_gb} GB</strong>
+                  <strong>
+                    {status.host.swap.total_gb} GB
+                  </strong>
                 </div>
 
                 <div className="detail-row">
                   <span>Libre</span>
-                  <strong>{status.host.swap.free_gb} GB</strong>
+                  <strong>
+                    {status.host.swap.free_gb} GB
+                  </strong>
                 </div>
               </section>
 
@@ -247,48 +325,101 @@ function App() {
                 <div className="section-heading">
                   <div>
                     <h3>Docker</h3>
-                    <p>{containerCount} contenedores</p>
+                    <p>
+                      {containerCount}{" "}
+                      {containerCount === 1
+                        ? "contenedor"
+                        : "contenedores"}
+                    </p>
                   </div>
                 </div>
 
                 <div className="containers">
                   {containers.map((container) => (
-                    <article className="container-card" key={container.id}>
+                    <article
+                      className="container-card"
+                      key={container.id}
+                    >
                       <div className="container-header">
                         <div>
-                          <strong>{container.name}</strong>
-                          <small>{container.image}</small>
+                          <strong>
+                            {container.name}
+                          </strong>
+
+                          <small>
+                            {container.image}
+                          </small>
                         </div>
 
-                        <span
-                          className={
-                            container.state === "running"
-                              ? "container-running"
-                              : "container-stopped"
-                          }
-                        >
-                          ● {container.state}
-                        </span>
+                        <div className="container-actions">
+                          <span
+                            className={
+                              container.state === "running"
+                                ? "container-running"
+                                : "container-stopped"
+                            }
+                          >
+                            ● {container.state}
+                          </span>
+
+                          <button
+                            type="button"
+                            className="restart-button"
+                            onClick={() =>
+                              restartContainer(
+                                container.name,
+                              )
+                            }
+                            disabled={
+                              restarting === container.name
+                            }
+                          >
+                            {restarting === container.name
+                              ? "Reiniciando..."
+                              : "Reiniciar"}
+                          </button>
+                        </div>
                       </div>
 
                       {container.stats && (
                         <div className="container-stats">
                           <div>
                             <span>CPU</span>
-                            <strong>{container.stats.cpu_percent}%</strong>
+
+                            <strong>
+                              {
+                                container.stats
+                                  .cpu_percent
+                              }
+                              %
+                            </strong>
                           </div>
 
                           <div>
                             <span>RAM</span>
+
                             <strong>
-                              {container.stats.memory.percent}%
+                              {
+                                container.stats
+                                  .memory.percent
+                              }
+                              %
                             </strong>
-                            <small>{container.stats.memory.usage}</small>
+
+                            <small>
+                              {
+                                container.stats
+                                  .memory.usage
+                              }
+                            </small>
                           </div>
 
                           <div>
                             <span>PIDs</span>
-                            <strong>{container.stats.pids}</strong>
+
+                            <strong>
+                              {container.stats.pids}
+                            </strong>
                           </div>
                         </div>
                       )}
