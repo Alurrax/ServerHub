@@ -194,6 +194,192 @@ def run_service_action(name: str, action: str) -> dict:
         "status": "success",
     }
 
+def get_docker_containers() -> dict:
+    command = [
+        "docker",
+        "ps",
+        "-a",
+        "--format",
+        "{{json .}}",
+    ]
+
+    try:
+        result = subprocess.run(
+            command,
+            capture_output=True,
+            text=True,
+            check=True,
+            timeout=10,
+        )
+
+    except subprocess.CalledProcessError as exc:
+        raise HTTPException(
+            status_code=500,
+            detail=exc.stderr.strip() or "Failed to read Docker containers",
+        ) from exc
+
+    except subprocess.TimeoutExpired as exc:
+        raise HTTPException(
+            status_code=504,
+            detail="Docker command timed out",
+        ) from exc
+
+    containers = []
+
+    for line in result.stdout.splitlines():
+        if not line.strip():
+            continue
+
+        item = json.loads(line)
+
+        containers.append(
+            {
+                "id": item.get("ID"),
+                "name": item.get("Names"),
+                "image": item.get("Image"),
+                "status": item.get("Status"),
+                "state": item.get("State"),
+                "ports": item.get("Ports"),
+                "created_at": item.get("CreatedAt"),
+            }
+        )
+
+    return {
+        "containers": containers,
+        "count": len(containers),
+    }
+
+def get_docker_container(name: str) -> dict:
+    try:
+        result = subprocess.run(
+            ["docker", "inspect", name],
+            capture_output=True,
+            text=True,
+            check=True,
+            timeout=10,
+        )
+
+    except subprocess.CalledProcessError as exc:
+        raise HTTPException(
+            status_code=404,
+            detail="Container not found",
+        ) from exc
+
+    except subprocess.TimeoutExpired as exc:
+        raise HTTPException(
+            status_code=504,
+            detail="Docker command timed out",
+        ) from exc
+
+    data = json.loads(result.stdout)[0]
+
+    state = data.get("State", {})
+    config = data.get("Config", {})
+    network_settings = data.get("NetworkSettings", {})
+
+    networks = {}
+
+    for network_name, network in network_settings.get(
+        "Networks", {}
+    ).items():
+        networks[network_name] = {
+            "ip_address": network.get("IPAddress"),
+            "gateway": network.get("Gateway"),
+            "mac_address": network.get("MacAddress"),
+        }
+
+    return {
+        "id": data.get("Id"),
+        "name": data.get("Name", "").lstrip("/"),
+        "image": config.get("Image"),
+        "status": state.get("Status"),
+        "running": state.get("Running"),
+        "started_at": state.get("StartedAt"),
+        "finished_at": state.get("FinishedAt"),
+        "restart_count": data.get("RestartCount"),
+        "platform": data.get("Platform"),
+        "networks": networks,
+        "ports": network_settings.get("Ports"),
+    }
+
+def get_docker_container_stats(name: str) -> dict:
+    command = [
+        "docker",
+        "stats",
+        name,
+        "--no-stream",
+        "--format",
+        "{{json .}}",
+    ]
+
+    try:
+        result = subprocess.run(
+            command,
+            capture_output=True,
+            text=True,
+            check=True,
+            timeout=10,
+        )
+
+    except subprocess.CalledProcessError as exc:
+        error = exc.stderr.strip()
+
+        if "No such container" in error:
+            raise HTTPException(
+                status_code=404,
+                detail="Container not found",
+            ) from exc
+
+        raise HTTPException(
+            status_code=500,
+            detail=error or "Failed to read container stats",
+        ) from exc
+
+    except subprocess.TimeoutExpired as exc:
+        raise HTTPException(
+            status_code=504,
+            detail="Docker stats timed out",
+        ) from exc
+
+    if not result.stdout.strip():
+        raise HTTPException(
+            status_code=404,
+            detail="Container not found",
+        )
+
+    data = json.loads(result.stdout)
+
+    memory_usage = data.get("MemUsage", "")
+    memory_parts = [
+        part.strip()
+        for part in memory_usage.split("/")
+    ]
+
+    return {
+        "name": data.get("Name"),
+        "cpu_percent": float(
+            data.get("CPUPerc", "0%").rstrip("%")
+        ),
+        "memory": {
+            "usage": (
+                memory_parts[0]
+                if len(memory_parts) >= 1
+                else None
+            ),
+            "limit": (
+                memory_parts[1]
+                if len(memory_parts) >= 2
+                else None
+            ),
+            "percent": float(
+                data.get("MemPerc", "0%").rstrip("%")
+            ),
+        },
+        "network_io": data.get("NetIO"),
+        "block_io": data.get("BlockIO"),
+        "pids": int(data.get("PIDs", 0)),
+    }
+
 
 @app.get("/health")
 def health():
@@ -239,3 +425,15 @@ def stop_service(name: str):
 @app.post("/services/{name}/restart")
 def restart_service(name: str):
     return run_service_action(name, "restart")
+
+@app.get("/docker/containers")
+def docker_containers():
+    return get_docker_containers()
+
+@app.get("/docker/containers/{name}")
+def docker_container_detail(name: str):
+    return get_docker_container(name)
+
+@app.get("/docker/containers/{name}/stats")
+def docker_container_stats(name: str):
+    return get_docker_container_stats(name)

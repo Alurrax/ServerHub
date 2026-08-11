@@ -128,3 +128,84 @@ def test_system_service_restart_forbidden():
         response.json()["detail"]
         == "Service is not managed by ServerHub"
     )
+
+def test_system_docker_containers():
+    response = client.get("/system/docker/containers")
+
+    assert response.status_code == 200
+
+    data = response.json()
+
+    assert "containers" in data
+    assert "count" in data
+    assert data["count"] >= 2
+
+    names = [
+        container["name"]
+        for container in data["containers"]
+    ]
+
+    assert "serverhub-api" in names
+    assert "serverhub-db" in names
+
+def test_system_docker_container_detail():
+    response = client.get(
+        "/system/docker/containers/serverhub-api"
+    )
+
+    assert response.status_code == 200
+
+    data = response.json()
+
+    assert data["name"] == "serverhub-api"
+    assert data["status"] == "running"
+    assert data["running"] is True
+
+    assert "image" in data
+    assert "restart_count" in data
+    assert "networks" in data
+    assert "ports" in data
+
+
+def test_system_docker_container_not_found():
+    response = client.get(
+        "/system/docker/containers/no-existe"
+    )
+
+    assert response.status_code == 404
+    assert response.json()["detail"] == "Container not found"
+
+def test_system_docker_container_stats():
+    response = client.get(
+        "/system/docker/containers/serverhub-api/stats"
+    )
+
+    assert response.status_code == 200
+
+    data = response.json()
+
+    assert data["name"] == "serverhub-api"
+
+    assert isinstance(data["cpu_percent"], float)
+    assert data["cpu_percent"] >= 0
+
+    assert "memory" in data
+    assert "usage" in data["memory"]
+    assert "limit" in data["memory"]
+    assert isinstance(data["memory"]["percent"], float)
+    assert data["memory"]["percent"] >= 0
+
+    assert "network_io" in data
+    assert "block_io" in data
+
+    assert isinstance(data["pids"], int)
+    assert data["pids"] >= 0
+
+
+def test_system_docker_container_stats_not_found():
+    response = client.get(
+        "/system/docker/containers/no-existe/stats"
+    )
+
+    assert response.status_code == 404
+    assert response.json()["detail"] == "Container not found"

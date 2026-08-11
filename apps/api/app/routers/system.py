@@ -58,7 +58,6 @@ def execute_service_action(name: str, action: str):
 
     return response.json()
 
-
 @router.get("/status")
 def system_status():
     boot_time = psutil.boot_time()
@@ -189,3 +188,74 @@ def system_service_stop(name: str):
 @router.post("/services/{name}/restart")
 def system_service_restart(name: str):
     return execute_service_action(name, "restart")
+
+@router.get("/docker/containers")
+def system_docker_containers():
+    agent_url = os.environ["AGENT_URL"]
+
+    try:
+        response = httpx.get(
+            f"{agent_url}/docker/containers",
+            timeout=5.0,
+        )
+        response.raise_for_status()
+
+    except httpx.HTTPError as exc:
+        raise HTTPException(
+            status_code=503,
+            detail="Host Agent unavailable",
+        ) from exc
+
+    return response.json()
+
+@router.get("/docker/containers/{name}")
+def system_docker_container_detail(name: str):
+    agent_url = os.environ["AGENT_URL"]
+
+    try:
+        response = httpx.get(
+            f"{agent_url}/docker/containers/{name}",
+            timeout=5.0,
+        )
+
+    except httpx.HTTPError as exc:
+        raise HTTPException(
+            status_code=503,
+            detail="Host Agent unavailable",
+        ) from exc
+
+    if response.status_code == 404:
+        raise HTTPException(
+            status_code=404,
+            detail="Container not found",
+        )
+
+    response.raise_for_status()
+
+    return response.json()
+
+@router.get("/docker/containers/{name}/stats")
+def system_docker_container_stats(name: str):
+    agent_url = os.environ["AGENT_URL"]
+
+    try:
+        response = httpx.get(
+            f"{agent_url}/docker/containers/{name}/stats",
+            timeout=10.0,
+        )
+
+    except httpx.HTTPError as exc:
+        raise HTTPException(
+            status_code=503,
+            detail="Host Agent unavailable",
+        ) from exc
+
+    if response.status_code == 404:
+        raise HTTPException(
+            status_code=404,
+            detail="Container not found",
+        )
+
+    response.raise_for_status()
+
+    return response.json()
