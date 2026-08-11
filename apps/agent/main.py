@@ -10,21 +10,36 @@ app = FastAPI(
     version="0.1.0",
 )
 
+
 MANAGED_SERVICES = {
-    "docker": "docker.service",
-    "smbd": "smbd.service",
+    "docker": {
+        "unit": "docker.service",
+        "actions": {"restart"},
+    },
+    "smbd": {
+        "unit": "smbd.service",
+        "actions": {"start", "stop", "restart"},
+    },
 }
 
-def validate_managed_service(name: str) -> str:
-    unit = MANAGED_SERVICES.get(name)
 
-    if unit is None:
+def validate_service_action(name: str, action: str) -> str:
+    service = MANAGED_SERVICES.get(name)
+
+    if service is None:
         raise HTTPException(
             status_code=403,
             detail="Service is not managed by ServerHub",
         )
 
-    return unit
+    if action not in service["actions"]:
+        raise HTTPException(
+            status_code=403,
+            detail=f"Action '{action}' is not allowed for service '{name}'",
+        )
+
+    return service["unit"]
+
 
 def bytes_to_gib(value: int | None) -> float | None:
     if value is None:
@@ -89,6 +104,7 @@ def get_disks() -> dict:
         "count": len(disks),
     }
 
+
 def get_services() -> dict:
     command = [
         "systemctl",
@@ -137,6 +153,7 @@ def get_services() -> dict:
         "count": len(services),
     }
 
+
 def get_service(name: str) -> dict | None:
     services = get_services()["services"]
 
@@ -145,6 +162,38 @@ def get_service(name: str) -> dict | None:
             return service
 
     return None
+
+
+def run_service_action(name: str, action: str) -> dict:
+    unit = validate_service_action(name, action)
+
+    try:
+        subprocess.run(
+            ["sudo", "systemctl", action, unit],
+            capture_output=True,
+            text=True,
+            check=True,
+            timeout=15,
+        )
+
+    except subprocess.CalledProcessError as exc:
+        raise HTTPException(
+            status_code=500,
+            detail=exc.stderr.strip() or f"Failed to {action} service",
+        ) from exc
+
+    except subprocess.TimeoutExpired as exc:
+        raise HTTPException(
+            status_code=504,
+            detail=f"Service {action} timed out",
+        ) from exc
+
+    return {
+        "service": name,
+        "action": action,
+        "status": "success",
+    }
+
 
 @app.get("/health")
 def health():
@@ -158,9 +207,11 @@ def health():
 def disks():
     return get_disks()
 
+
 @app.get("/services")
 def services():
     return get_services()
+
 
 @app.get("/services/{name}")
 def service_detail(name: str):
@@ -174,33 +225,17 @@ def service_detail(name: str):
 
     return service
 
+
+@app.post("/services/{name}/start")
+def start_service(name: str):
+    return run_service_action(name, "start")
+
+
+@app.post("/services/{name}/stop")
+def stop_service(name: str):
+    return run_service_action(name, "stop")
+
+
 @app.post("/services/{name}/restart")
 def restart_service(name: str):
-    unit = validate_managed_service(name)
-
-    try:
-        subprocess.run(
-            ["sudo", "systemctl", "restart", unit],
-            capture_output=True,
-            text=True,
-            check=True,
-            timeout=15,
-        )
-
-    except subprocess.CalledProcessError as exc:
-        raise HTTPException(
-            status_code=500,
-            detail=exc.stderr.strip() or "Failed to restart service",
-        ) from exc
-
-    except subprocess.TimeoutExpired as exc:
-        raise HTTPException(
-            status_code=504,
-            detail="Service restart timed out",
-        ) from exc
-
-    return {
-        "service": name,
-        "action": "restart",
-        "status": "success",
-    }
+    return run_service_action(name, "restart")

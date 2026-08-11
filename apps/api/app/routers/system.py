@@ -1,8 +1,8 @@
 import os
 import socket
 import time
-import httpx
 
+import httpx
 import psutil
 from fastapi import APIRouter, HTTPException
 
@@ -15,6 +15,48 @@ router = APIRouter(
 
 def bytes_to_gb(value: int) -> float:
     return round(value / (1024**3), 2)
+
+
+def execute_service_action(name: str, action: str):
+    agent_url = os.environ["AGENT_URL"]
+
+    try:
+        response = httpx.post(
+            f"{agent_url}/services/{name}/{action}",
+            timeout=15.0,
+        )
+
+    except httpx.HTTPError as exc:
+        raise HTTPException(
+            status_code=503,
+            detail="Host Agent unavailable",
+        ) from exc
+
+    if response.status_code == 403:
+        detail = response.json().get(
+            "detail",
+            "Action not allowed",
+        )
+        raise HTTPException(
+            status_code=403,
+            detail=detail,
+        )
+
+    if response.status_code == 404:
+        raise HTTPException(
+            status_code=404,
+            detail="Service not found",
+        )
+
+    if response.status_code >= 500:
+        raise HTTPException(
+            status_code=502,
+            detail=f"Host Agent failed to {action} service",
+        )
+
+    response.raise_for_status()
+
+    return response.json()
 
 
 @router.get("/status")
@@ -66,6 +108,7 @@ def system_status():
         },
     }
 
+
 @router.get("/disks")
 def system_disks():
     agent_url = os.environ["AGENT_URL"]
@@ -85,6 +128,7 @@ def system_disks():
 
     return response.json()
 
+
 @router.get("/services")
 def system_services():
     agent_url = os.environ["AGENT_URL"]
@@ -103,6 +147,7 @@ def system_services():
         ) from exc
 
     return response.json()
+
 
 @router.get("/services/{name}")
 def system_service_detail(name: str):
@@ -130,40 +175,17 @@ def system_service_detail(name: str):
 
     return response.json()
 
+
+@router.post("/services/{name}/start")
+def system_service_start(name: str):
+    return execute_service_action(name, "start")
+
+
+@router.post("/services/{name}/stop")
+def system_service_stop(name: str):
+    return execute_service_action(name, "stop")
+
+
 @router.post("/services/{name}/restart")
 def system_service_restart(name: str):
-    agent_url = os.environ["AGENT_URL"]
-
-    try:
-        response = httpx.post(
-            f"{agent_url}/services/{name}/restart",
-            timeout=15.0,
-        )
-
-    except httpx.HTTPError as exc:
-        raise HTTPException(
-            status_code=503,
-            detail="Host Agent unavailable",
-        ) from exc
-
-    if response.status_code == 403:
-        raise HTTPException(
-            status_code=403,
-            detail="Service is not managed by ServerHub",
-        )
-
-    if response.status_code == 404:
-        raise HTTPException(
-            status_code=404,
-            detail="Service not found",
-        )
-
-    if response.status_code >= 500:
-        raise HTTPException(
-            status_code=502,
-            detail="Host Agent failed to restart service",
-        )
-
-    response.raise_for_status()
-
-    return response.json()
+    return execute_service_action(name, "restart")
