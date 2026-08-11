@@ -74,3 +74,26 @@ export type ServicesResponse = {
   services: SystemService[];
   count: number;
 };
+
+export type DiskPartition = {
+  name: string;
+  path: string;
+  filesystem: string | null;
+  label: string | null;
+  size_gib: number;
+  available_gib: number | null;
+  used_percent: string | null;
+  mountpoints: string[];
+};
+
+export type Disk = {
+  name: string;
+  path: string;
+  size_gib: number;
+  partitions: DiskPartition[];
+};
+
+export type DisksResponse = {
+  disks: Disk[];
+  count: number;
+};
